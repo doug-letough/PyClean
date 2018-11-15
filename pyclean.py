@@ -479,6 +479,8 @@ class Filter:
         self.regex_files = regex_files
         # A dict of the regexs compiled from the regex_files defined above.
         self.etc_re = {}
+        # A dict receiving the post currently processed by filters
+        self.post = {}
 
         # Hostname - Not a 100% perfect regex but probably good enough.
         self.regex_hostname = re.compile('([a-zA-Z0-9]|[a-zA-Z0-9]'
@@ -540,109 +542,111 @@ class Filter:
         # Set a datetime object for next midnight
         self.midnight_trigger = next_midnight()
 
-    def filter(self, art):
-        # Initialize the posting info dict
-        post = {}
+    def get_post(self, art):
+      # Attempt to split the From address into component parts
+      if 'From' in art:
+          self.post['from_name'], \
+              self.post['from_email'] = self.addressParse(art['From'])
 
+      if art[Content_Type] is not None:
+          ct = self.regex_ct.match(art[Content_Type])
+          if ct:
+              self.post['content_type'] = ct.group(1).lower()
+          ctcs = self.regex_ctcs.search(art[Content_Type])
+          if ctcs:
+              self.post['charset'] = ctcs.group(1).lower()
+
+      # Try to establish the injection-host, posting-host and
+      # posting-account
+      if art[Injection_Info] is not None:
+          # Establish Posting Account
+          ispa = self.regex_pa.search(art[Injection_Info])
+          if ispa:
+              self.post['posting-account'] = ispa.group(1)
+          # Establish Posting Host
+          isph = self.regex_ph.search(art[Injection_Info])
+          if isph:
+              self.post['posting-host'] = isph.group(1)
+          # Establish injection host
+          isih = self.regex_hostname.match(art[Injection_Info])
+          if isih:
+              self.post['injection-host'] = isih.group(0)
+
+      # posting-host might be obtainable from NNTP-Posting-Host
+      if 'posting-host' not in self.post and art[NNTP_Posting_Host] is not None:
+          self.post['posting-host'] = str(art[NNTP_Posting_Host])
+
+      # If the injection-host wasn't found in Injection-Info, try the X-Trace
+      # header.  We only look for a hostname as the first field in X-Trace,
+      # otherwise it's regex hell.
+      if 'injection-host' not in self.post and art[X_Trace] is not None:
+          isih = self.regex_hostname.match(art[X_Trace])
+          if isih:
+              self.post['injection-host'] = isih.group(0)
+
+      # Try to extract a hostname from the Path header
+      if config.getboolean('hostnames', 'path_hostname'):
+          # First, check for a !.POSTED tag, as per RFC5537
+          if 'injection-host' not in self.post and "!.POSTED" in str(art[Path]):
+              postsplit = str(art[Path]).split("!.POSTED", 1)
+              pathhost = postsplit[0].split("!")[-1]
+              if pathhost:
+                  self.post['injection-host'] = pathhost
+          # Last resort, try the right-most entry in the Path header
+          if 'injection-host' not in self.post:
+              subhost = re.sub(self.regex_pathhost, '', art[Path])
+              pathhost = subhost.split("!")[-1]
+              if pathhost:
+                  self.post['injection-host'] = pathhost
+
+      # Some services (like Google) use dozens of Injection Hostnames.
+      # This section looks for substring matches and replaces the entire
+      # Injection-Host with the substring.
+      if 'injection-host' in self.post:
+          for ihsub in self.ihsubs:
+              if ihsub in post['injection-host']:
+                  logging.debug("Injection-Host: Replacing %s with %s",
+                                self.post['injection-host'], ihsub)
+                  self.post['injection-host'] = ihsub
+
+      # Ascertain if the posting-host is meaningful
+      if 'posting-host' in self.post:
+          isbad_ph = self.groups.regex.bad_ph.search(post['posting-host'])
+          if isbad_ph:
+              self.post['bad-posting-host'] = isbad_ph.group(0)
+              logging.debug('Bad posting host: %s',
+                            self.post['bad-posting-host'])
+
+      # Dizum deserves a scalar all to itself!
+      dizum = False
+      if ('injection-host' in self.post and
+              self.post['injection-host'] == 'sewer.dizum.com'):
+          dizum = True
+
+      # The host that fed us this article is first in the Path header.
+      self.post['feed-host'] = str(art[Path]).split('!', 1)[0]
+
+      # Analyze the Newsgroups header
+      self.groups.analyze(art[Newsgroups], art[Followup_To])
+
+      # Is the source of the post considered local?
+      local = False
+      if ('injection-host' in self.post and
+              'local_hosts' in self.etc_re and
+              self.etc_re['local_hosts'].search(self.post['injection-host'])):
+          local = True
+      
+
+    def filter(self, art):
         # Trigger timed reloads
         if now() > self.hourly_trigger:
             self.hourly_events()
         if now() > self.midnight_trigger:
             self.midnight_events()
 
-        # Attempt to split the From address into component parts
-        if 'From' in art:
-            post['from_name'], \
-                post['from_email'] = self.addressParse(art['From'])
-
-        if art[Content_Type] is not None:
-            ct = self.regex_ct.match(art[Content_Type])
-            if ct:
-                post['content_type'] = ct.group(1).lower()
-            ctcs = self.regex_ctcs.search(art[Content_Type])
-            if ctcs:
-                post['charset'] = ctcs.group(1).lower()
-
-        # Try to establish the injection-host, posting-host and
-        # posting-account
-        if art[Injection_Info] is not None:
-            # Establish Posting Account
-            ispa = self.regex_pa.search(art[Injection_Info])
-            if ispa:
-                post['posting-account'] = ispa.group(1)
-            # Establish Posting Host
-            isph = self.regex_ph.search(art[Injection_Info])
-            if isph:
-                post['posting-host'] = isph.group(1)
-            # Establish injection host
-            isih = self.regex_hostname.match(art[Injection_Info])
-            if isih:
-                post['injection-host'] = isih.group(0)
-
-        # posting-host might be obtainable from NNTP-Posting-Host
-        if 'posting-host' not in post and art[NNTP_Posting_Host] is not None:
-            post['posting-host'] = str(art[NNTP_Posting_Host])
-
-        # If the injection-host wasn't found in Injection-Info, try the X-Trace
-        # header.  We only look for a hostname as the first field in X-Trace,
-        # otherwise it's regex hell.
-        if 'injection-host' not in post and art[X_Trace] is not None:
-            isih = self.regex_hostname.match(art[X_Trace])
-            if isih:
-                post['injection-host'] = isih.group(0)
-
-        # Try to extract a hostname from the Path header
-        if config.getboolean('hostnames', 'path_hostname'):
-            # First, check for a !.POSTED tag, as per RFC5537
-            if 'injection-host' not in post and "!.POSTED" in str(art[Path]):
-                postsplit = str(art[Path]).split("!.POSTED", 1)
-                pathhost = postsplit[0].split("!")[-1]
-                if pathhost:
-                    post['injection-host'] = pathhost
-            # Last resort, try the right-most entry in the Path header
-            if 'injection-host' not in post:
-                subhost = re.sub(self.regex_pathhost, '', art[Path])
-                pathhost = subhost.split("!")[-1]
-                if pathhost:
-                    post['injection-host'] = pathhost
-
-        # Some services (like Google) use dozens of Injection Hostnames.
-        # This section looks for substring matches and replaces the entire
-        # Injection-Host with the substring.
-        if 'injection-host' in post:
-            for ihsub in self.ihsubs:
-                if ihsub in post['injection-host']:
-                    logging.debug("Injection-Host: Replacing %s with %s",
-                                  post['injection-host'], ihsub)
-                    post['injection-host'] = ihsub
-
-        # Ascertain if the posting-host is meaningful
-        if 'posting-host' in post:
-            isbad_ph = self.groups.regex.bad_ph.search(post['posting-host'])
-            if isbad_ph:
-                post['bad-posting-host'] = isbad_ph.group(0)
-                logging.debug('Bad posting host: %s',
-                              post['bad-posting-host'])
-
-        # Dizum deserves a scalar all to itself!
-        dizum = False
-        if ('injection-host' in post and
-                post['injection-host'] == 'sewer.dizum.com'):
-            dizum = True
-
-        # The host that fed us this article is first in the Path header.
-        post['feed-host'] = str(art[Path]).split('!', 1)[0]
-
-        # Analyze the Newsgroups header
-        self.groups.analyze(art[Newsgroups], art[Followup_To])
-
-        # Is the source of the post considered local?
-        local = False
-        if ('injection-host' in post and
-                'local_hosts' in self.etc_re and
-                self.etc_re['local_hosts'].search(post['injection-host'])):
-            local = True
-
+        # Collect post representation and put it into self.post
+        self.get_post(art)
+        
         # --- Everything below is accept / reject code ---
 
         # Reject any messages that don't have a Message-ID
