@@ -67,19 +67,19 @@ def future(days=0, hours=0, mins=0, secs=0):
 # -----This section is concerned with setting up a default configuration
 
 
-def makedir(d):
+def makedir(directory):
     """Check if a given directory exists.  If it doesn't, check if the
     parent exists.  If it does then the new directory will be created.  If
     not then sensible options are exhausted and the program aborts.
 
     """
-    if not os.path.isdir(d):
-        parent = os.path.dirname(d)
+    if not os.path.isdir(directory):
+        parent = os.path.dirname(directory)
         if os.path.isdir(parent):
-            os.mkdir(d, 0700)
-            sys.stdout.write("%s: Directory created.\n" % d)
+            os.mkdir(directory, 0700)
+            sys.stdout.write("%s: Directory created.\n" % directory)
         else:
-            msg = "%s: Unable to make directory. Aborting.\n" % d
+            msg = "%s: Unable to make directory. Aborting.\n" % directory
             sys.stdout.write(msg)
             sys.exit(1)
 
@@ -536,130 +536,127 @@ class Filter:
                            maxentries=config.getint('emp', 'ihn_maxentries'),
                            timedtrim=config.getint('emp', 'ihn_timed_trim'))
 
+        # Will receive the Message-ID
+        # We use Message-ID strings so much, it's useful to have a shortcut.
+        self.mid = None
+
         # Initialize timed events
         self.hourly_events(startup=True)
         # Set a datetime object for next midnight
         self.midnight_trigger = next_midnight()
 
     def get_post(self, art):
-      # Attempt to split the From address into component parts
-      if 'From' in art:
-          self.post['from_name'], \
-              self.post['from_email'] = self.addressParse(art['From'])
+        # Attempt to split the From address into component parts
+        if 'From' in art:
+            self.post['from_name'], \
+                self.post['from_email'] = self.addressParse(art['From'])
 
-      if art[Content_Type] is not None:
-          ct = self.regex_ct.match(art[Content_Type])
-          if ct:
-              self.post['content_type'] = ct.group(1).lower()
-          ctcs = self.regex_ctcs.search(art[Content_Type])
-          if ctcs:
-              self.post['charset'] = ctcs.group(1).lower()
+        if art[Content_Type] is not None:
+            ct = self.regex_ct.match(art[Content_Type])
+            if ct:
+                self.post['content_type'] = ct.group(1).lower()
+            ctcs = self.regex_ctcs.search(art[Content_Type])
+            if ctcs:
+                self.post['charset'] = ctcs.group(1).lower()
 
-      # Try to establish the injection-host, posting-host and
-      # posting-account
-      if art[Injection_Info] is not None:
-          # Establish Posting Account
-          ispa = self.regex_pa.search(art[Injection_Info])
-          if ispa:
-              self.post['posting-account'] = ispa.group(1)
-          # Establish Posting Host
-          isph = self.regex_ph.search(art[Injection_Info])
-          if isph:
-              self.post['posting-host'] = isph.group(1)
-          # Establish injection host
-          isih = self.regex_hostname.match(art[Injection_Info])
-          if isih:
-              self.post['injection-host'] = isih.group(0)
+        # Try to establish the injection-host, posting-host and
+        # posting-account
+        if art[Injection_Info] is not None:
+            # Establish Posting Account
+            ispa = self.regex_pa.search(art[Injection_Info])
+            if ispa:
+                self.post['posting-account'] = ispa.group(1)
+            # Establish Posting Host
+            isph = self.regex_ph.search(art[Injection_Info])
+            if isph:
+                self.post['posting-host'] = isph.group(1)
+            # Establish injection host
+            isih = self.regex_hostname.match(art[Injection_Info])
+            if isih:
+                self.post['injection-host'] = isih.group(0)
 
-      # posting-host might be obtainable from NNTP-Posting-Host
-      if 'posting-host' not in self.post and art[NNTP_Posting_Host] is not None:
-          self.post['posting-host'] = str(art[NNTP_Posting_Host])
+        # posting-host might be obtainable from NNTP-Posting-Host
+        if 'posting-host' not in self.post and art[NNTP_Posting_Host] is not None:
+            self.post['posting-host'] = str(art[NNTP_Posting_Host])
 
-      # If the injection-host wasn't found in Injection-Info, try the X-Trace
-      # header.  We only look for a hostname as the first field in X-Trace,
-      # otherwise it's regex hell.
-      if 'injection-host' not in self.post and art[X_Trace] is not None:
-          isih = self.regex_hostname.match(art[X_Trace])
-          if isih:
-              self.post['injection-host'] = isih.group(0)
+        # If the injection-host wasn't found in Injection-Info, try the X-Trace
+        # header.  We only look for a hostname as the first field in X-Trace,
+        # otherwise it's regex hell.
+        if 'injection-host' not in self.post and art[X_Trace] is not None:
+            isih = self.regex_hostname.match(art[X_Trace])
+            if isih:
+                self.post['injection-host'] = isih.group(0)
 
-      # Try to extract a hostname from the Path header
-      if config.getboolean('hostnames', 'path_hostname'):
-          # First, check for a !.POSTED tag, as per RFC5537
-          if 'injection-host' not in self.post and "!.POSTED" in str(art[Path]):
-              postsplit = str(art[Path]).split("!.POSTED", 1)
-              pathhost = postsplit[0].split("!")[-1]
-              if pathhost:
-                  self.post['injection-host'] = pathhost
-          # Last resort, try the right-most entry in the Path header
-          if 'injection-host' not in self.post:
-              subhost = re.sub(self.regex_pathhost, '', art[Path])
-              pathhost = subhost.split("!")[-1]
-              if pathhost:
-                  self.post['injection-host'] = pathhost
+        # Try to extract a hostname from the Path header
+        if config.getboolean('hostnames', 'path_hostname'):
+            # First, check for a !.POSTED tag, as per RFC5537
+            if 'injection-host' not in self.post and "!.POSTED" in str(art[Path]):
+                postsplit = str(art[Path]).split("!.POSTED", 1)
+                pathhost = postsplit[0].split("!")[-1]
+                if pathhost:
+                    self.post['injection-host'] = pathhost
+            # Last resort, try the right-most entry in the Path header
+            if 'injection-host' not in self.post:
+                subhost = re.sub(self.regex_pathhost, '', art[Path])
+                pathhost = subhost.split("!")[-1]
+                if pathhost:
+                    self.post['injection-host'] = pathhost
 
-      # Some services (like Google) use dozens of Injection Hostnames.
-      # This section looks for substring matches and replaces the entire
-      # Injection-Host with the substring.
-      if 'injection-host' in self.post:
-          for ihsub in self.ihsubs:
-              if ihsub in self.post['injection-host']:
-                  logging.debug("Injection-Host: Replacing %s with %s",
-                                self.post['injection-host'], ihsub)
-                  self.post['injection-host'] = ihsub
+        # Some services (like Google) use dozens of Injection Hostnames.
+        # This section looks for substring matches and replaces the entire
+        # Injection-Host with the substring.
+        if 'injection-host' in self.post:
+            for ihsub in self.ihsubs:
+                if ihsub in self.post['injection-host']:
+                    logging.debug("Injection-Host: Replacing %s with %s",
+                                  self.post['injection-host'], ihsub)
+                    self.post['injection-host'] = ihsub
 
-      # Ascertain if the posting-host is meaningful
-      if 'posting-host' in self.post:
-          isbad_ph = self.groups.regex.bad_ph.search(self.post['posting-host'])
-          if isbad_ph:
-              self.post['bad-posting-host'] = isbad_ph.group(0)
-              logging.debug('Bad posting host: %s',
-                            self.post['bad-posting-host'])
+        # Ascertain if the posting-host is meaningful
+        if 'posting-host' in self.post:
+            isbad_ph = self.groups.regex.bad_ph.search(self.post['posting-host'])
+            if isbad_ph:
+                self.post['bad-posting-host'] = isbad_ph.group(0)
+                logging.debug('Bad posting host: %s',
+                              self.post['bad-posting-host'])
 
-      # Dizum deserves a scalar all to itself!
-      self.post['dizum'] = False
-      if ('injection-host' in self.post and
-              self.post['injection-host'] == 'sewer.dizum.com'):
-          self.post['dizum'] = True
+        # Dizum deserves a scalar all to itself!
+        self.post['dizum'] = False
+        if ('injection-host' in self.post and
+                self.post['injection-host'] == 'sewer.dizum.com'):
+            self.post['dizum'] = True
 
-      # The host that fed us this article is first in the Path header.
-      self.post['feed-host'] = str(art[Path]).split('!', 1)[0]
+        # The host that fed us this article is first in the Path header.
+        self.post['feed-host'] = str(art[Path]).split('!', 1)[0]
 
-      # Analyze the Newsgroups header
-      self.groups.analyze(art[Newsgroups], art[Followup_To])
+        # Analyze the Newsgroups header
+        self.groups.analyze(art[Newsgroups], art[Followup_To])
 
-      # Is the source of the post considered local?
-      self.post['local'] = False
-      if ('injection-host' in self.post and
-              'local_hosts' in self.etc_re and
-              self.etc_re['local_hosts'].search(self.post['injection-host'])):
-          self.post['local'] = True
-      
+        # Is the source of the post considered local?
+        self.post['local'] = False
+        if ('injection-host' in self.post and
+                'local_hosts' in self.etc_re and
+                self.etc_re['local_hosts'].search(self.post['injection-host'])):
+            self.post['local'] = True
 
-    def filter(self, art):
-        # Trigger timed reloads
-        if now() > self.hourly_trigger:
-            self.hourly_events()
-        if now() > self.midnight_trigger:
-            self.midnight_events()
+    # --- All filter methods are prefixed by filter_
+    # --- All filter_* methods must return False or None if article
+    # --- is accepted and must return anything but False or None if
+    # --- article is rejected
 
-        # Collect post representation and put it into self.post
-        self.get_post(art)
-        
-        # --- Everything below is accept / reject code ---
-
+    def filter_message_id(self, art):
         # Reject any messages that don't have a Message-ID
         if Message_ID not in art:
-            logging.warn("Wot no Message-ID!  Rejecting message because the "
-                         "implications of accepting it are unpredictable.")
+            logging.warn("Wot no Message-ID!  Rejecting message because the implications of accepting it are unpredictable.")
             return self.reject(art, self.post, "No Message-ID header")
         # We use Message-ID strings so much, it's useful to have a shortcut.
-        mid = str(art[Message_ID])
-
+        self.mid = str(art[Message_ID])
         # Now we're convinced we have a MID, log it for local posts.
         if self.post['local']:
-            logging.debug("Local post: %s", mid)
+            logging.debug("Local post: %s", self.mid)
+        return False
 
+    def filter_cmsg(self, art):
         # Control message handling
         if art[Control] is not None:
             ctrltype = str(art[Control]).split(" ", 1)[0]
@@ -677,215 +674,222 @@ class Filter:
                     art, self.post,
                     "Redundant Control Type: %s" % ctrltype)
             else:
-                logging.info('Control: %s, mid=%s' % (art[Control], mid))
-            return ''
+                logging.info('Control: %s, mid=%s' % (art[Control], self.mid))
+            return False
 
+    def filter_fu2(self, art):
         # No followups is a reject as is more than 2 groups.
         if self.groups['futcount'] < 1 or self.groups['futcount'] > 2:
             # Max-crosspost check
             if self.groups['count'] > config.get('groups', 'max_crosspost'):
                 return self.reject(art, self.post, "Crosspost Limit Exceeded")
             # Max low crosspost check
-            if self.groups['count'] > config.get('groups',
-                                                 'max_low_crosspost'):
+            if self.groups['count'] > config.get('groups', 'max_low_crosspost'):
                 if self.groups['lowcp'] > 0:
-                    return self.reject(art, self.post,
-                                       "Crosspost Low Limit Exceeded")
+                    return self.reject(art, self.post, "Crosspost Low Limit Exceeded")
+        return False
 
-        # Lines check
+    def filter_lines_check(self, art):
+        # Lines check (not a real filter, only logs inconsistency of Lines: header)
         if art[Lines] and int(art[Lines]) != int(art[__LINES__]):
             logmes = "Lines Mismatch: Header=%s, INN=%s, mid=%s"
             if art[User_Agent] is not None:
                 logmes += ", Agent=%s"
-                logging.debug(logmes % (art[Lines], art[__LINES__],
-                                        mid, art[User_Agent]))
+                logging.debug(logmes % (art[Lines], art[__LINES__], self.mid, art[User_Agent]))
             else:
-                logging.debug(logmes % (art[Lines], art[__LINES__], mid))
+                logging.debug(logmes % (art[Lines], art[__LINES__], self.mid))
+        return False
 
+    def filter_newsguy(self, art):
         # Newsguy are evil sex spammers
-        if ('newsguy.com' in mid and
+        if ('newsguy.com' in self.mid and
                 config.getboolean('filters', 'newsguy') and
                 'sex_groups' in self.groups and
                 self.groups['sex_groups'] > 0):
             return self.reject(art, self.post, "Newsguy Sex")
+        return False
 
+    def filter_os2(self, art):
         # For some reason, this OS2 group has become kook central
-        if ('comp.os.os2.advocacy' in self.groups['groups'] and
-                self.groups['count'] > 1):
+        if 'comp.os.os2.advocacy' in self.groups['groups'] and self.groups['count'] > 1:
             return self.reject(art, self.post, "OS2 Crosspost")
         if (art[Followup_To] and
                 'comp.os.os2.advocacy' in str(art[Followup_To])):
             return self.reject(art, self.post, "OS2 Followup")
+        return False
 
+    def filter_snipe(self, art):
         # Poor snipe is getting the Greg Hall treatment
+        #
+        # FIXME: Can't it be filtered by a default bad_from ?
+        #
         if 'injection-host' in self.post:
-            if self.post['injection-host'].startswith(
-                    "snipe.eternal-september.org"):
+            if self.post['injection-host'].startswith("snipe.eternal-september.org"):
                 pass
                 # self.logart("Snipe Post", art, self.post, 'log_snipe')
             else:
-                if ("sn!pe" in self.post['from_name'] or
-                        "snipeco" in self.post['from_email']):
+                if "sn!pe" in self.post['from_name'] or "snipeco" in self.post['from_email']:
                     return self.reject(art, self.post, "Snipe Forge")
+        return False
 
-        # Compare headers against regex files
-
+    def filter_whitelist_host(self, art):
         # Check if posting-host is whitelisted
-        gph = False
-        if('posting-host' in self.post and 'good_posthost' in self.etc_re):
-            gph = self.etc_re['good_posthost'].search(self.post['posting-host'])
-            if gph:
-                logging.info("Whitelisted posting. host=%s, msgid=%s",
-                             self.post['posting-host'],
-                             art[Message_ID])
+        # Only logs result and always return False
+        if 'posting-host' in self.post and 'good_posthost' in self.etc_re:
+            self.gph = self.etc_re['good_posthost'].search(self.post['posting-host'])
+            if self.gph:
+                logging.info("Whitelisted posting. host=%s, msgid=%s", self.post['posting-host'], art[Message_ID])
+        return False
 
+    def filter_bad_posting_host(self, art):
         # Reject these posting-hosts
-        if ('posting-host' in self.post and not gph and
+        if ('posting-host' in self.post and not self.gph and
                 'bad_posting-host' not in self.post and
                 'bad_posthost' in self.etc_re):
             bph = self.etc_re['bad_posthost'].search(self.post['posting-host'])
             if bph:
-                return self.reject(
-                    art, self.post,
-                    "Bad Posting-Host (%s)" % bph.group(0))
+                return self.reject(art, self.post, "Bad Posting-Host (%s)" % bph.group(0))
+        return False
 
+    def filter_bad_crosspost_host(self, art):
         # Test posting-hosts that are not allowed to crosspost
-        if ('posting-host' in self.post and not gph and
+        if ('posting-host' in self.post and not self.gph and
                 self.groups['count'] > 1 and
                 'bad_crosspost_host' in self.etc_re):
             ph = self.post['posting-host']
             bph = self.etc_re['bad_crosspost_host'].search(ph)
             if bph:
-                return self.reject(
-                    art, self.post,
-                    "Bad Crosspost Host (%s)" % bph.group(0))
+                return self.reject(art, self.post, "Bad Crosspost Host (%s)" % bph.group(0))
+        return False
 
+    def filter_crosspost_group(self, art):
         # Groups where crossposting is not allowed
-        if (self.groups['count'] > 1 and not gph and
-                'bad_cp_groups' in self.etc_re):
+        if self.groups['count'] > 1 and not self.gph and 'bad_cp_groups' in self.etc_re:
             bcg = self.etc_re['bad_cp_groups'].search(art[Newsgroups])
             if bcg:
-                return self.reject(
-                    art, self.post,
-                    "Bad Crosspost Group (%s)" % bcg.group(0))
+                return self.reject(art, self.post, "Bad Crosspost Group (%s)" % bcg.group(0))
+        return False
 
+    def filter_log_from(self, art):
+        # Only logs From: header result and always return False
         if 'log_from' in self.etc_re:
             lf_result = self.etc_re['log_from'].search(art[From])
             if lf_result:
-                self.logart(lf_result.group(0), art, self.post, 'log_from',
-                            trim=False)
+                self.logart(lf_result.group(0), art, self.post, 'log_from', trim=False)
+        return False
 
-        if 'bad_groups' in self.etc_re and not gph:
+    def filter_bad_group(self, art):
+        if 'bad_groups' in self.etc_re and not self.gph:
             bg_result = self.etc_re['bad_groups'].search(art[Newsgroups])
             if bg_result:
-                return self.reject(
-                    art, self.post,
-                    "Bad Group (%s)" % bg_result.group(0))
+                return self.reject(art, self.post, "Bad Group (%s)" % bg_result.group(0))
+        return False
 
+    def filter_dizum(self, art):
+        # Some groups are not allowed from dizum
         if self.post['dizum'] and 'bad_groups_dizum' in self.etc_re:
             bgd = self.etc_re['bad_groups_dizum'].search(art[Newsgroups])
             if bgd:
-                return self.reject(
-                    art, self.post,
-                    "Bad Dizum Group (%s)" % bgd.group(0))
+                return self.reject(art, self.post, "Bad Dizum Group (%s)" % bgd.group(0))
+        return False
 
+    def filter_auk_bad_xpost(self, art):
         # AUK bad crossposts
         if self.groups['kooks'] > 0:
             if ('alt.free.newsservers' in self.groups['groups'] or
                     'alt.privacy.anon-server' in self.groups['groups']):
                 return self.reject(art, self.post, "AUK Bad Crosspost")
+        return False
 
-        if 'bad_from' in self.etc_re and not gph:
+    def filter_bad_from(self, art):
+        if 'bad_from' in self.etc_re and not self.gph:
             bf_result = self.etc_re['bad_from'].search(art[From])
             if bf_result:
-                return self.reject(
-                    art, self.post,
-                    "Bad From (%s)" % bf_result.group(0))
+                return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
+        return False
 
+    def filter_bad_subject(self, art):
         # Bad subject checking (Currently only on Dizum posts)
-        if self.post['dizum'] and 'bad_subject' in self.etc_re and not gph:
+        if self.post['dizum'] and 'bad_subject' in self.etc_re and not self.gph:
             bs_result = self.etc_re['bad_subject'].search(art[Subject])
             if bs_result:
-                return self.reject(
-                    art, self.post,
-                    "Bad Subject (%s)" % bs_result.group(0))
+                return self.reject(art, self.post, "Bad Subject (%s)" % bs_result.group(0))
+        return False
 
-        if 'bad_body' in self.etc_re and not gph:
+    def filter_bad_body(self, art):
+        if 'bad_body' in self.etc_re and not self.gph:
             bb_result = self.etc_re['bad_body'].search(art[__BODY__])
             if bb_result:
-                return self.reject(
-                    art, self.post,
-                    "Bad Body (%s)" % bb_result.group(0), "Bad Body")
+                return self.reject(art, self.post, "Bad Body (%s)" % bb_result.group(0), "Bad Body")
+        return False
 
-        # The following checks are for locally posted articles
-
+    def filter_local_xpost(self, art):
         # Groups where crossposting is not allowed
-        if (self.post['local'] and not gph and self.groups['count'] > 1 and
+        if (self.post['local'] and not self.gph and self.groups['count'] > 1 and
                 'local_bad_cp_groups' in self.etc_re):
-            b = self.etc_re['local_bad_cp_groups'].search(art[Newsgroups])
-            if b:
-                return self.reject(
-                    art, self.post,
-                    "Local Bad Crosspost Group (%s)" % b.group(0))
+            blc = self.etc_re['local_bad_cp_groups'].search(art[Newsgroups])
+            if blc:
+                return self.reject(art, self.post, "Local Bad Crosspost Group (%s)" % blc.group(0))
+        return False
 
+    def filter_local_bad_from(self, art):
         # Local Bad From
-        if self.post['local'] and not gph and 'local_bad_from' in self.etc_re:
+        if self.post['local'] and not self.gph and 'local_bad_from' in self.etc_re:
             reg = self.etc_re['local_bad_from']
             bf_result = reg.search(art[From])
             if bf_result:
-                return self.reject(
-                    art, self.post,
-                    "Local Bad From (%s)" % bf_result.group(0),
-                    "Local Reject")
+                return self.reject(art, self.post, "Local Bad From (%s)" % bf_result.group(0), "Local Reject")
+        return False
+
+
+    def filter_local_bad_suject(self, art):
         # Local Bad Subject
-        if self.post['local'] and not gph and 'local_bad_subject' in self.etc_re:
+        if self.post['local'] and not self.gph and 'local_bad_subject' in self.etc_re:
             reg = self.etc_re['local_bad_subject']
             bs_result = reg.search(art[Subject])
             if bs_result:
-                return self.reject(
-                    art, self.post,
-                    "Local Bad Subject (%s)" % bs_result.group(0),
-                    "Local Reject")
+                return self.reject(art, self.post, "Local Bad Subject (%s)" % bs_result.group(0), "Local Reject")
+
+    def filter_local_bad_groups(self, art):
         # Local Bad Groups
-        if self.post['local'] and not gph and 'local_bad_groups' in self.etc_re:
+        if self.post['local'] and not self.gph and 'local_bad_groups' in self.etc_re:
             reg = self.etc_re['local_bad_groups']
             bg_result = reg.search(art[Newsgroups])
             if bg_result:
-                return self.reject(
-                    art, self.post,
-                    "Local Bad Group (%s)" % bg_result.group(0))
+                return self.reject(art, self.post, "Local Bad Group (%s)" % bg_result.group(0))
+        return False
 
+    def filter_local_bad_body(self, art):
         # Local Bad Body
-        if self.post['local'] and not gph and 'local_bad_body' in self.etc_re:
+        if self.post['local'] and not self.gph and 'local_bad_body' in self.etc_re:
             reg = self.etc_re['local_bad_body']
             bb_result = reg.search(art[__BODY__])
             if bb_result:
                 return self.reject(
-                    art, self.post,
-                    "Local Bad Body (%s)" % bb_result.group(0),
-                    "Local Reject")
+                    art, self.post, "Local Bad Body (%s)" % bb_result.group(0), "Local Reject")
+        return False
 
+    def filter_binary_misplaced(self, art):
         # Misplaced binary check
-        if self.groups['bin_allowed_bool']:
-            # All groups in the post match bin_allowed groups
-            isbin = False
-        else:
+        isbin = False
+        # All groups in the post match bin_allowed groups
+        if not self.groups['bin_allowed_bool']:
             # Potentially expensive check if article contains binary
             isbin = self.binary.isbin(art)
         # Generic 'binary' means it looks binary-like but doesn't match any
         # known encoding method.
         if isbin == 'binary':
             if config.getboolean('binary', 'reject_suspected'):
-                return self.reject(
-                    art, self.post, "Binary (%s)" % isbin)
+                return self.reject(art, self.post, "Binary (%s)" % isbin)
             else:
-                self.logart("Binary Suspect", art, self.post, "bin_suspect",
-                            trim=False)
+                self.logart("Binary Suspect", art, self.post, "bin_suspect", trim=False)
         elif isbin:
             self.binary.increment(self.post['feed-host'])
-            return self.reject(
-                art, self.post, "Binary (%s)" % isbin)
+            return self.reject(art, self.post, "Binary (%s)" % isbin)
+        return False
 
+
+    def filter_html_misplaced(self, art):
         # Misplaced HTML check
         if (not self.groups['html_allowed_bool'] and
                 config.getboolean('filters', 'reject_html') and
@@ -896,19 +900,23 @@ class Filter:
                 if config.getboolean('filters', 'reject_multipart'):
                     return self.reject(art, self.post, "MIME Multpart")
                 else:
-                    logging.debug('Multipart: %s' % mid)
+                    logging.debug('Multipart: %s' % self.mid)
+        return False
 
+    def filter_symbol_ratio(self, art):
         # Symbol ratio test
         symlen = len(self.regex_symbols.findall(art[__BODY__]))
         if symlen > 100:
             return self.reject(art, self.post, "Symbols (%s)" % symlen)
+        return False
 
+    def filter_emp(self, art):
         # Start of EMP checks
-        if (not self.groups['emp_exclude_bool'] and
-                not self.groups['test_bool']):
+        if not self.groups['emp_exclude_bool'] and not self.groups['test_bool']:
             ngs = ','.join(self.groups['groups'])
             # If a substring matches the Newsgroups header, use just that
             # substring as EMP fodder where a Newsgroups name is normally used.
+            fodder = None
             for ngsub in self.ngsubs:
                 if ngsub in ngs:
                     logging.info("Newsgroup substring match: %s", ngsub)
@@ -923,43 +931,31 @@ class Filter:
             elif 'bad-posting-host' in self.post:
                 # If we can't trust the info in posting-host, use the
                 # injection-host. This is a worst-case scenario.
-                if ('injection-host' in self.post and
-                        config.getboolean('emp', 'ph_coarse')):
+                if 'injection-host' in self.post and config.getboolean('emp', 'ph_coarse'):
                     fodder = self.post['injection-host']
-                else:
-                    fodder = None
             elif 'posting-host' in self.post:
                 fodder = self.post['posting-host']
-            else:
-                fodder = None
             if fodder:
                 # Beginning of PHN filters
                 if 'moderated' in self.groups and self.groups['moderated']:
-                    logging.debug("Bypassing PHN filter due to moderated "
-                                  "group in distribution")
+                    logging.debug("Bypassing PHN filter due to moderated group in distribution")
                 elif self.post['local']:
                     # Beginning of PHN_Local filter
                     do_lphn = True
                     if self.groups['phn_exclude_bool']:
-                            do_lphn = False
-                    if (not do_lphn and art['References'] is None and
-                            'Subject' in art and
-                            str(art['Subject']).startswith("Re:")):
-                        logging.info("emp_lphn: Exclude overridden - "
-                                     "Subject Re but no Reference")
+                        do_lphn = False
+                    if not do_lphn and art['References'] is None and 'Subject' in art and str(art['Subject']).startswith("Re:"):
+                        logging.info("emp_lphn: Exclude overridden - Subject Re but no Reference")
                         do_lphn = True
-                    if (not do_lphn and
-                            self.regex_crspace.search(art[__BODY__])):
-                        logging.info("emp_lphn: Exclude overridden - "
-                                     "Carriage Return starts line")
+                    if not do_lphn and self.regex_crspace.search(art[__BODY__]):
+                        logging.info("emp_lphn: Exclude overridden - Carriage Return starts line")
                         do_lphn = True
                     if do_lphn and self.emp_lphn.add(fodder + ngs):
                         return self.reject(art, self.post, "EMP Local PHN Reject")
                 else:
                     # Beginning of standard PHN filter
                     if self.groups['phn_exclude_bool']:
-                        logging.debug("emp_phn exclude for: %s",
-                                      art['Newsgroups'])
+                        logging.debug("emp_phn exclude for: %s", art['Newsgroups'])
                     elif self.emp_phn.add(fodder + ngs):
                         return self.reject(art, self.post, "EMP PHN Reject")
                 # Beginning of PHL filter
@@ -973,8 +969,7 @@ class Filter:
             if ('injection-host' in self.post and
                     'ihn_hosts' in self.etc_re and
                     not self.groups['ihn_exclude_bool']):
-                ihn_result = self.etc_re['ihn_hosts']. \
-                    search(self.post['injection-host'])
+                ihn_result = self.etc_re['ihn_hosts'].search(self.post['injection-host'])
                 if ihn_result:
                     logging.debug("emp_ihn hit: %s", ihn_result.group(0))
                     if self.emp_ihn.add(self.post['injection-host'] + ngs):
@@ -984,14 +979,41 @@ class Filter:
             if art[__BODY__] is not None:
                 if self.emp_body.add(art[__BODY__]):
                     return self.reject(art, self.post, "EMP Body Reject")
+        return False
 
+    def filter_log_local(self, art):
+        # Only log local accepted article
+        # Always return False
         if self.post['local']:
-            # All tests passed.  Log the locally posted message.
-            logging.info("post: mid=%s, from=%s, groups=%s",
-                         art[Message_ID], art[From], art[Newsgroups])
+            # Log the locally posted message.
+            logging.info("post: mid=%s, from=%s, groups=%s", art[Message_ID], art[From], art[Newsgroups])
             self.logart('Local Post', art, self.post, 'local_post')
+        return False
+
+    def filter(self, art):
+        # Trigger timed reloads
+        if now() > self.hourly_trigger:
+            self.hourly_events()
+        if now() > self.midnight_trigger:
+            self.midnight_events()
+
+        # Collect post representation and put it into self.post
+        self.get_post(art)
+
+        # Test all filters on article by cycling the filter_*
+        # methods of the Filter object.
+        #
+        # Anything else but None or False returned by one of the filter_*
+        # methods stop the loop and article is considered as Rejected
+        self.gph = False
+        for attr in dir(self):
+            is_filtered = False
+            if attr.find('filter_') == 0:
+                is_filtered = eval('self.%s' % attr)(art)
+            if is_filtered:
+                return is_filtered
         # The article passed all checks. Return an empty string.
-        return ""
+        return ''
 
     def addressParse(self, addr):
         name, email = parseaddr(addr)
