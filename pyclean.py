@@ -335,8 +335,7 @@ class InndFilter:
         'unknown'.  Actually 'unknown' shouldn't happen; it's there
         in case feeping creatures invade innd.
         """
-        INN.syslog('n', 'state change from %s to %s - %s'
-                        % (oldmode, newmode, reason))
+        INN.syslog('n', 'state change from %s to %s - %s' % (oldmode, newmode, reason))
 
 
 class Binary:
@@ -618,10 +617,10 @@ class Filter:
                             self.post['bad-posting-host'])
 
       # Dizum deserves a scalar all to itself!
-      dizum = False
+      self.post['dizum'] = False
       if ('injection-host' in self.post and
               self.post['injection-host'] == 'sewer.dizum.com'):
-          dizum = True
+          self.post['dizum'] = True
 
       # The host that fed us this article is first in the Path header.
       self.post['feed-host'] = str(art[Path]).split('!', 1)[0]
@@ -630,11 +629,11 @@ class Filter:
       self.groups.analyze(art[Newsgroups], art[Followup_To])
 
       # Is the source of the post considered local?
-      local = False
+      self.post['local'] = False
       if ('injection-host' in self.post and
               'local_hosts' in self.etc_re and
               self.etc_re['local_hosts'].search(self.post['injection-host'])):
-          local = True
+          self.post['local'] = True
       
 
     def filter(self, art):
@@ -658,7 +657,7 @@ class Filter:
         mid = str(art[Message_ID])
 
         # Now we're convinced we have a MID, log it for local posts.
-        if local:
+        if self.post['local']:
             logging.debug("Local post: %s", mid)
 
         # Control message handling
@@ -719,7 +718,7 @@ class Filter:
             return self.reject(art, self.post, "OS2 Followup")
 
         # Poor snipe is getting the Greg Hall treatment
-        if 'injection-host' in post:
+        if 'injection-host' in self.post:
             if self.post['injection-host'].startswith(
                     "snipe.eternal-september.org"):
                 pass
@@ -751,7 +750,7 @@ class Filter:
                     "Bad Posting-Host (%s)" % bph.group(0))
 
         # Test posting-hosts that are not allowed to crosspost
-        if ('posting-host' in post and not gph and
+        if ('posting-host' in self.post and not gph and
                 self.groups['count'] > 1 and
                 'bad_crosspost_host' in self.etc_re):
             ph = self.post['posting-host']
@@ -783,7 +782,7 @@ class Filter:
                     art, self.post,
                     "Bad Group (%s)" % bg_result.group(0))
 
-        if dizum and 'bad_groups_dizum' in self.etc_re:
+        if self.post['dizum'] and 'bad_groups_dizum' in self.etc_re:
             bgd = self.etc_re['bad_groups_dizum'].search(art[Newsgroups])
             if bgd:
                 return self.reject(
@@ -804,7 +803,7 @@ class Filter:
                     "Bad From (%s)" % bf_result.group(0))
 
         # Bad subject checking (Currently only on Dizum posts)
-        if dizum and 'bad_subject' in self.etc_re and not gph:
+        if self.post['dizum'] and 'bad_subject' in self.etc_re and not gph:
             bs_result = self.etc_re['bad_subject'].search(art[Subject])
             if bs_result:
                 return self.reject(
@@ -821,7 +820,7 @@ class Filter:
         # The following checks are for locally posted articles
 
         # Groups where crossposting is not allowed
-        if (local and not gph and self.groups['count'] > 1 and
+        if (self.post['local'] and not gph and self.groups['count'] > 1 and
                 'local_bad_cp_groups' in self.etc_re):
             b = self.etc_re['local_bad_cp_groups'].search(art[Newsgroups])
             if b:
@@ -830,7 +829,7 @@ class Filter:
                     "Local Bad Crosspost Group (%s)" % b.group(0))
 
         # Local Bad From
-        if local and not gph and 'local_bad_from' in self.etc_re:
+        if self.post['local'] and not gph and 'local_bad_from' in self.etc_re:
             reg = self.etc_re['local_bad_from']
             bf_result = reg.search(art[From])
             if bf_result:
@@ -839,7 +838,7 @@ class Filter:
                     "Local Bad From (%s)" % bf_result.group(0),
                     "Local Reject")
         # Local Bad Subject
-        if local and not gph and 'local_bad_subject' in self.etc_re:
+        if self.post['local'] and not gph and 'local_bad_subject' in self.etc_re:
             reg = self.etc_re['local_bad_subject']
             bs_result = reg.search(art[Subject])
             if bs_result:
@@ -848,7 +847,7 @@ class Filter:
                     "Local Bad Subject (%s)" % bs_result.group(0),
                     "Local Reject")
         # Local Bad Groups
-        if local and not gph and 'local_bad_groups' in self.etc_re:
+        if self.post['local'] and not gph and 'local_bad_groups' in self.etc_re:
             reg = self.etc_re['local_bad_groups']
             bg_result = reg.search(art[Newsgroups])
             if bg_result:
@@ -857,7 +856,7 @@ class Filter:
                     "Local Bad Group (%s)" % bg_result.group(0))
 
         # Local Bad Body
-        if local and not gph and 'local_bad_body' in self.etc_re:
+        if self.post['local'] and not gph and 'local_bad_body' in self.etc_re:
             reg = self.etc_re['local_bad_body']
             bb_result = reg.search(art[__BODY__])
             if bb_result:
@@ -938,7 +937,7 @@ class Filter:
                 if 'moderated' in self.groups and self.groups['moderated']:
                     logging.debug("Bypassing PHN filter due to moderated "
                                   "group in distribution")
-                elif local:
+                elif self.post['local']:
                     # Beginning of PHN_Local filter
                     do_lphn = True
                     if self.groups['phn_exclude_bool']:
@@ -986,7 +985,7 @@ class Filter:
                 if self.emp_body.add(art[__BODY__]):
                     return self.reject(art, self.post, "EMP Body Reject")
 
-        if local:
+        if self.post['local']:
             # All tests passed.  Log the locally posted message.
             logging.info("post: mid=%s, from=%s, groups=%s",
                          art[Message_ID], art[From], art[Newsgroups])
