@@ -669,10 +669,13 @@ class Filter:
                 self.etc_re['local_hosts'].search(self.post['injection-host'])):
             self.post['local'] = True
 
-    # --- All filter methods are prefixed by filter_
+    # --- By convention all filter methods are prefixed by filter_
     # --- All filter_* methods must return False or None if article
-    # --- is accepted and must return anything but False or None if
+    # --- is accepted and should return anything but False or None if
     # --- article is rejected
+    # 
+    # --- To activate a filter method it must be added to self.filters
+    # --- (see Filter.__init__()
 
     def filter_message_id(self, art):
         # Reject any messages that don't have a Message-ID
@@ -1020,6 +1023,9 @@ class Filter:
             self.logart('Local Post', art, self.post, 'local_post')
         return False
 
+    # --- End of filters definition
+
+    
     def filter(self, art):
         # Trigger timed reloads
         if now() > self.hourly_trigger:
