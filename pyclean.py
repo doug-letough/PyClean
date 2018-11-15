@@ -1036,8 +1036,8 @@ class Filter:
         # Anything else but None or False returned by one of filterss
         # stops the loop and article is considered as Rejected
         self.gph = False
-        for filter in self.filters:
-            is_filtered = self.filters[filter](art)
+        for inn_filter in self.filters:
+            is_filtered = inn_filter(art)
             if is_filtered:
                 return is_filtered
         # The article passed all checks. Return an empty string.
