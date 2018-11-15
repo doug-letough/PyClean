@@ -971,14 +971,14 @@ class Filter:
             if self.emp_fsl.add(fsl):
                 return self.reject(art, self.post, "EMP FSL Reject")
             # Beginning of IHN filter
-            if ('injection-host' in post and
+            if ('injection-host' in self.post and
                     'ihn_hosts' in self.etc_re and
                     not self.groups['ihn_exclude_bool']):
                 ihn_result = self.etc_re['ihn_hosts']. \
-                    search(post['injection-host'])
+                    search(self.post['injection-host'])
                 if ihn_result:
                     logging.debug("emp_ihn hit: %s", ihn_result.group(0))
-                    if self.emp_ihn.add(post['injection-host'] + ngs):
+                    if self.emp_ihn.add(self.post['injection-host'] + ngs):
                         return self.reject(art, self.post, "EMP IHN Reject")
             # Beginning of EMP Body filter.  Do this last, it's most
             # expensive in terms of processing.
