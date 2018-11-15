@@ -545,6 +545,36 @@ class Filter:
         # Set a datetime object for next midnight
         self.midnight_trigger = next_midnight()
 
+        # Ordered list of all filters that will be applyed
+        self.filters = [ filter_message_id, 
+                         filter_cmsg, 
+                         filter_fu2, 
+                         filter_lines_check, 
+                         filter_newsguy, 
+                         filter_os2, 
+                         filter_snipe, 
+                         filter_whitelist_host, 
+                         filter_bad_posting_host, 
+                         filter_bad_crosspost_host, 
+                         filter_crosspost_group, 
+                         filter_log_from, 
+                         filter_bad_group, 
+                         filter_dizum, 
+                         filter_auk_bad_xpost, 
+                         filter_bad_from, 
+                         filter_bad_subject, 
+                         filter_bad_body, 
+                         filter_local_xpost, 
+                         filter_local_bad_from, 
+                         filter_local_bad_suject, 
+                         filter_local_bad_groups, 
+                         filter_local_bad_body, 
+                         filter_binary_misplaced, 
+                         filter_html_misplaced, 
+                         filter_symbol_ratio, 
+                         filter_emp, 
+                         filter_log_local ]
+
     def get_post(self, art):
         # Attempt to split the From address into component parts
         if 'From' in art:
@@ -1000,16 +1030,14 @@ class Filter:
         # Collect post representation and put it into self.post
         self.get_post(art)
 
-        # Test all filters on article by cycling the filter_*
-        # methods of the Filter object.
+        # Test all filters on article by cycling the self.filters
+        # registered methods from the Filter object.
         #
-        # Anything else but None or False returned by one of the filter_*
-        # methods stop the loop and article is considered as Rejected
+        # Anything else but None or False returned by one of filterss
+        # stops the loop and article is considered as Rejected
         self.gph = False
-        for attr in dir(self):
-            is_filtered = False
-            if attr.find('filter_') == 0:
-                is_filtered = eval('self.%s' % attr)(art)
+        for filter in self.filters:
+            is_filtered = self.filters[filter](art)
             if is_filtered:
                 return is_filtered
         # The article passed all checks. Return an empty string.
