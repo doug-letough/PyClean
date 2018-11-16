@@ -444,7 +444,7 @@ class Filter:
         # Initialize Binary Filters
         self.binary = Binary()
         # Initialise SpamAssassin client
-        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
+        #~ self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
         logging.debug("SpamAssassin: Host: %s / Port: %s / User: %s", config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user'))
 
         # Posting Host and Posting Account
