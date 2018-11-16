@@ -445,7 +445,7 @@ class Filter:
         self.binary = Binary()
         # Initialise SpamAssassin client
         self.spamassclient = None
-        if config.has_section('spamassassin'] and  config.getboolean('spamassassin', 'active'):
+        if config.has_section('spamassassin') and  config.getboolean('spamassassin', 'active'):
             try:
                 self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user'))
             except Exception as e:
