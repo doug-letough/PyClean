@@ -443,7 +443,9 @@ class Filter:
         self.groups = Groups()
         # Initialize Binary Filters
         self.binary = Binary()
-        #~ self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=config.get('spamassassin', 'port'), user=config.get('spamassassin', 'user')
+        # Initialise SpamAssassin client
+        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
+        logging.debug("SpamAssassin: Host: %s / Port: %s / User: %s", config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user'))
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
