@@ -13,6 +13,7 @@ import shelve
 import sys
 import time
 import traceback
+import spamc
 
 # In Python2.4, utils was called Utils
 try:
@@ -442,6 +443,7 @@ class Filter:
         self.groups = Groups()
         # Initialize Binary Filters
         self.binary = Binary()
+        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=config.get('spamassassin', 'port'), user=config.get('spamassassin', 'user')
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
@@ -500,8 +502,7 @@ class Filter:
         # Match lines that start with a CR
         self.regex_crspace = re.compile("^\r ", re.MULTILINE)
         # Redundant control message types
-        self.redundant_controls = ['sendsys', 'senduuname', 'version',
-                                   'whogets']
+        self.redundant_controls = ['sendsys', 'senduuname', 'version', 'whogets']
 
         # Set up the EMP filters
         self.emp_body = EMP(name='emp_body',
@@ -675,7 +676,7 @@ class Filter:
     # --- article is rejected
     # 
     # --- To activate a filter method it must be added to self.filters
-    # --- (see Filter.__init__()
+    # --- [see Filter.__init__()]
 
     def filter_message_id(self, art):
         # Reject any messages that don't have a Message-ID
@@ -1023,6 +1024,13 @@ class Filter:
             self.logart('Local Post', art, self.post, 'local_post')
         return False
 
+    def filter_spamassassin(self, art):
+      # Perform spamassassin check
+      # Learning spam/ham is done within different filter
+      # An article that passed all filters is always learn as ham.
+      # See 
+      pass
+
     # --- End of filters definition
 
     
@@ -1046,7 +1054,13 @@ class Filter:
             is_filtered = inn_filter(art)
             if is_filtered:
                 return is_filtered
-        # The article passed all checks. Return an empty string.
+        # The article passed all checks.
+        # At this point we are about to accept this article
+        # so we make it learnt as ham by spamassassin
+        self.spamassclient.learn(art, 'ham')
+
+        # At this point all went Ok
+        # Return an empty string.
         return ''
 
     def addressParse(self, addr):
@@ -1555,8 +1569,11 @@ class EMP:
         self.stats['accepted'] = 0
         self.stats['rejected'] = 0
 
-
-
+"""
+********************************************************************************
+* Main
+********************************************************************************
+"""
 
 """
 Okay, that's the end of our class definition.  What follows is the

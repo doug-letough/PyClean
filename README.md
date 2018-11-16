@@ -171,7 +171,7 @@ Most of the filter files use the same syntax wich has 2 parts on each line:
 * One regular expression between slashes
 * An expire date in YYYYmmdd format
 
-You may need to restart INN at first startup otherwise, after you modified a filter file you can just reload the INN python filter:
+You may need to restart INN at first startup. In any case after you modified a filter file you can just reload the INN python filter:
 ```shell
 sudo -u news /usr/lib/news/bin/ctlinnd reload filter.python "PyClean Initial load"
 OK
