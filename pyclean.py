@@ -1080,7 +1080,7 @@ class Filter:
         # At this point we are about to accept this article
         # so we make it learnt as ham by spamassassin
         try:
-            if elf.spamassclient:
+            if self.spamassclient:
                 self.spamassclient.learn(self.rebuild_art(art), 'ham')
         except Exception as e:
             logging.info("Error at ham learning: %s" % e)
