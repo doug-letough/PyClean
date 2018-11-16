@@ -444,8 +444,8 @@ class Filter:
         # Initialize Binary Filters
         self.binary = Binary()
         # Initialise SpamAssassin client
-        #~ self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
-        logging.debug("SpamAssassin: Host: %s / Port: %s / User: %s", config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user'))
+        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
+        logging.info("SpamAssassin: Host: %s / Port: %s / User: %s", config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user'))
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
@@ -671,6 +671,22 @@ class Filter:
                 'local_hosts' in self.etc_re and
                 self.etc_re['local_hosts'].search(self.post['injection-host'])):
             self.post['local'] = True
+
+    def rebuild_art(self, art):
+        # Rebuild original article from art
+        rb_art = ''
+        for header in art:
+            if art[header] != None:
+                try:
+                    header_value = art[header][:]
+                except TypeError:
+                    header_value = art[header]
+                if header != '__BODY__':
+                    if header == '__LINES__':
+                        header = 'Lines'
+                    rb_art += '%s: %s\n' % (header, header_value)
+        rb_art += '\n%s\n' % (art['__BODY__'][:])
+        return rb_art
 
     # --- By convention all filter methods are prefixed by filter_
     # --- All filter_* methods must return False or None if article
@@ -1035,7 +1051,6 @@ class Filter:
 
     # --- End of filters definition
 
-    
     def filter(self, art):
         # Trigger timed reloads
         if now() > self.hourly_trigger:
@@ -1059,7 +1074,10 @@ class Filter:
         # The article passed all checks.
         # At this point we are about to accept this article
         # so we make it learnt as ham by spamassassin
-        #~ self.spamassclient.learn(art, 'ham')
+        try:
+          self.spamassclient.learn(self.rebuild_art(art), 'ham')
+        except Exxception as e:
+          logging.info("Error at ham learning: %s" % e)
 
         # At this point all went Ok
         # Return an empty string.
