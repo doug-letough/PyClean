@@ -444,8 +444,8 @@ class Filter:
         # Initialize Binary Filters
         self.binary = Binary()
         # Initialise SpamAssassin client
-        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user')
-        logging.info("SpamAssassin: Host: %s / Port: %s / User: %s", config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user'))
+        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user'))
+        logging.info("SpamAssassin: Host: %s / Port: %s / User: %s" % (config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user')))
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
@@ -1076,7 +1076,7 @@ class Filter:
         # so we make it learnt as ham by spamassassin
         try:
           self.spamassclient.learn(self.rebuild_art(art), 'ham')
-        except Exxception as e:
+        except Exception as e:
           logging.info("Error at ham learning: %s" % e)
 
         # At this point all went Ok
