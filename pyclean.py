@@ -444,8 +444,13 @@ class Filter:
         # Initialize Binary Filters
         self.binary = Binary()
         # Initialise SpamAssassin client
-        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user'))
-        logging.info("SpamAssassin: Host: %s / Port: %s / User: %s" % (config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user')))
+        self.spamassclient = None
+        if config.has_section('spamassassin'] and  config.getboolean('spamassassin', 'active'):
+            try:
+                self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=int(config.get('spamassassin', 'port')), user=config.get('spamassassin', 'user'))
+            except Exception as e:
+              logging.info("[!!] SpamAssassin: Unable to connect (%s): Host: %s / Port: %s / User: %s" % (e, config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user')))
+            logging.info("SpamAssassin: Host: %s / Port: %s / User: %s" % (config.get('spamassassin', 'host'), config.get('spamassassin', 'port'), config.get('spamassassin', 'user')))
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
@@ -773,7 +778,7 @@ class Filter:
     def filter_snipe(self, art):
         # Poor snipe is getting the Greg Hall treatment
         #
-        # FIXME: Can't it be filtered by a default bad_from ?
+        # TODO: Can't it be filtered by a default bad_from ?
         #
         if 'injection-host' in self.post:
             if self.post['injection-host'].startswith("snipe.eternal-september.org"):
@@ -1075,9 +1080,10 @@ class Filter:
         # At this point we are about to accept this article
         # so we make it learnt as ham by spamassassin
         try:
-          self.spamassclient.learn(self.rebuild_art(art), 'ham')
+            if elf.spamassclient:
+                self.spamassclient.learn(self.rebuild_art(art), 'ham')
         except Exception as e:
-          logging.info("Error at ham learning: %s" % e)
+            logging.info("Error at ham learning: %s" % e)
 
         # At this point all went Ok
         # Return an empty string.
