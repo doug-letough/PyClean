@@ -443,7 +443,7 @@ class Filter:
         self.groups = Groups()
         # Initialize Binary Filters
         self.binary = Binary()
-        self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=config.get('spamassassin', 'port'), user=config.get('spamassassin', 'user')
+        #~ self.spamassclient = spamc.SpamC(host=config.get('spamassassin', 'host'), port=config.get('spamassassin', 'port'), user=config.get('spamassassin', 'user')
 
         # Posting Host and Posting Account
         self.regex_ph = re.compile('posting-host *= *"?([^";]+)')
@@ -1057,7 +1057,7 @@ class Filter:
         # The article passed all checks.
         # At this point we are about to accept this article
         # so we make it learnt as ham by spamassassin
-        self.spamassclient.learn(art, 'ham')
+        #~ self.spamassclient.learn(art, 'ham')
 
         # At this point all went Ok
         # Return an empty string.
@@ -1596,6 +1596,7 @@ if 'python_filter' not in dir():
     logfile.setLevel(loglevels[config.get('logging', 'level')])
     logfile.setFormatter(logging.Formatter(logfmt, datefmt=datefmt))
     logging.getLogger().addHandler(logfile)
+    logging.info("Python version: %s" % python_version)
 
 # Log configuration
 logging.info("Loaded configuration:")
