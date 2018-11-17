@@ -855,11 +855,10 @@ class Filter:
     def filter_bad_from(self, art):
         if 'bad_from' in self.etc_re and not self.gph:
             bf_result = self.etc_re['bad_from'].search(art[From])
-            if art[Control]:
-                if config.getboolean('control', 'reject_from_bad_from'):
-                    return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
-                logging.info('CMSG: %s (accepted: %s)' % (self.mid, str(config.getboolean('control', 'reject_from_bad_from'))))
-            elif bf_result:
+            if bf_result:
+                if art[Control] and not config.getboolean('control', 'reject_from_bad_from'):
+                    logging.info('CMSG: %s (Rejected: %s)' % (self.mid, str(config.getboolean('control', 'reject_from_bad_from'))))
+                    return False
                 return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
         return False
 
