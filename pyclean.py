@@ -554,34 +554,36 @@ class Filter:
         self.midnight_trigger = next_midnight()
 
         # Ordered list of all filters that will be applyed
-        self.filters = [ self.filter_message_id, 
-                         self.filter_cmsg, 
-                         self.filter_fu2, 
-                         self.filter_lines_check, 
-                         self.filter_newsguy, 
-                         self.filter_os2, 
-                         self.filter_snipe, 
-                         self.filter_whitelist_host, 
-                         self.filter_bad_posting_host, 
-                         self.filter_bad_crosspost_host, 
-                         self.filter_crosspost_group, 
-                         self.filter_log_from, 
-                         self.filter_bad_group, 
-                         self.filter_dizum, 
-                         self.filter_auk_bad_xpost, 
-                         self.filter_bad_from, 
-                         self.filter_bad_subject, 
-                         self.filter_bad_body, 
-                         self.filter_local_xpost, 
-                         self.filter_local_bad_from, 
-                         self.filter_local_bad_suject, 
-                         self.filter_local_bad_groups, 
-                         self.filter_local_bad_body, 
-                         self.filter_binary_misplaced, 
-                         self.filter_html_misplaced, 
-                         self.filter_symbol_ratio, 
-                         self.filter_emp, 
-                         self.filter_log_local ]
+        self.filters = [self.filter_message_id, 
+                        self.filter_cmsg, 
+                        self.filter_fu2, 
+                        self.filter_lines_check, 
+                        self.filter_newsguy, 
+                        self.filter_os2, 
+                        self.filter_snipe, 
+                        self.filter_whitelist_host, 
+                        self.filter_bad_posting_host, 
+                        self.filter_bad_crosspost_host, 
+                        self.filter_crosspost_group, 
+                        self.filter_log_from, 
+                        self.filter_bad_group, 
+                        self.filter_dizum, 
+                        self.filter_auk_bad_xpost, 
+                        self.filter_bad_from, 
+                        self.filter_bad_subject, 
+                        self.filter_bad_body, 
+                        self.filter_local_xpost, 
+                        self.filter_local_bad_from, 
+                        self.filter_local_bad_suject, 
+                        self.filter_local_bad_groups, 
+                        self.filter_local_bad_body, 
+                        self.filter_binary_misplaced, 
+                        self.filter_html_misplaced, 
+                        self.filter_symbol_ratio, 
+                        self.filter_emp, 
+                        self.filter_log_local,
+                        self.filter_spamassassin
+                       ]
 
     def get_post(self, art):
         # Attempt to split the From address into component parts
@@ -1048,8 +1050,9 @@ class Filter:
       # Perform spamassassin check
       # Learning spam/ham is done within different filter
       # An article that passed all filters is always learn as ham.
-      # See 
-      pass
+      if self.spamassclient:
+        spam_check = self.spamassclient.check(self.rebuild_art(art))
+        logging.info("Spamcheck: mid=%s, %s", art[Message_ID], spam_check)
 
     # --- End of filters definition
 
