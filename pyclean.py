@@ -857,7 +857,7 @@ class Filter:
             bf_result = self.etc_re['bad_from'].search(art[From])
             if bf_result:
                 if art[Control] and not config.getboolean('control', 'reject_from_bad_from'):
-                    logging.info('CMSG: %s (Rejected: %s)' % (self.mid, str(config.getboolean('control', 'reject_from_bad_from'))))
+                    logging.info('CMSG from bad_from: %s (Rejected: %s)' % (self.mid, str(config.getboolean('control', 'reject_from_bad_from'))))
                     return False
                 return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
         return False
@@ -1104,6 +1104,9 @@ class Filter:
                 self.logart(reason, art, post, self.log_rules[logrule])
                 break
         logging.info("reject: mid=%s, reason=%s" % (art[Message_ID], reason))
+        if reason.startswith('EMP'):
+            logging.info("Spamd: learning spam=%s, reason=%s" % (art[Message_ID], reason))
+            self.spamassclient.learn(self.rebuild_art(art), 'spam')
         if short_reason is None:
             # Sometimes we don't want to provide the source with a detailed
             # reason of why a message was rejected.  They could then just
