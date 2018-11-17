@@ -1052,7 +1052,8 @@ class Filter:
       # An article that passed all filters is always learn as ham.
       if self.spamassclient:
         spam_check = self.spamassclient.report_ifspam(self.rebuild_art(art))
-        logging.info("Spamcheck: mid=%s, %s", art[Message_ID], spam_check)
+        if bool(spam_check['isspam']):
+          logging.info("Spamcheck: mid=%s, %s", art[Message_ID], spam_check)
 
     # --- End of filters definition
 
