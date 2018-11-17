@@ -719,17 +719,11 @@ class Filter:
             ctrltype = str(art[Control]).split(" ", 1)[0]
             # Reject control messages with supersedes headers
             if art[Supersedes] is not None:
-                return self.reject(
-                    art, self.post,
-                    'Control %s with Supersedes header' % ctrltype)
-            if (ctrltype == 'cancel' and
-                    config.getboolean('control', 'reject_cancels')):
+                return self.reject(art, self.post, 'Control %s with Supersedes header' % ctrltype)
+            if (ctrltype == 'cancel' and config.getboolean('control', 'reject_cancels')):
                 return self.reject(art, self.post, "Control cancel")
-            elif (ctrltype in self.redundant_controls and
-                  config.getboolean('control', 'reject_redundant')):
-                return self.reject(
-                    art, self.post,
-                    "Redundant Control Type: %s" % ctrltype)
+            elif (ctrltype in self.redundant_controls and config.getboolean('control', 'reject_redundant')):
+                return self.reject(art, self.post, "Redundant Control Type: %s" % ctrltype)
             else:
                 logging.info('Control: %s, mid=%s' % (art[Control], self.mid))
             return False
@@ -861,7 +855,11 @@ class Filter:
     def filter_bad_from(self, art):
         if 'bad_from' in self.etc_re and not self.gph:
             bf_result = self.etc_re['bad_from'].search(art[From])
-            if bf_result:
+            if art[Control]:
+                if config.getboolean('control', 'reject_from_bad_from'):
+                    return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
+                logging.info('CMSG: %s (accepted: %s)' % (self.mid, str(config.getboolean('control', 'reject_from_bad_from'))))
+            elif bf_result:
                 return self.reject(art, self.post, "Bad From (%s)" % bf_result.group(0))
         return False
 
@@ -1607,6 +1605,7 @@ stuff you need to do to get it all working inside innd.
 """
 
 if 'python_filter' not in dir():
+    # Only at start
     python_version = sys.version_info
     config = init_config()
     logfmt = config.get('logging', 'format')
@@ -1624,7 +1623,7 @@ if 'python_filter' not in dir():
     logging.getLogger().addHandler(logfile)
     logging.info("Python version: %s" % python_version)
 
-# Log configuration
+# Log actual configuration
 logging.info("Loaded configuration:")
 logging.info("---------------------")
 for section in config.sections():
